@@ -1,4 +1,5 @@
 from django.db.models import Model
+from django.db.models.queryset import QuerySet
 from django.core import serializers
 from tastypie.resources import Resource
 from tastypie_model_method import container
@@ -10,11 +11,9 @@ class ModelMethodResource(Resource):
   
   computed_value - string or json object
   error - string
-  id - of object that performed calculation, for reference by client-side models
   """
   computed_value = fields.CharField(attribute='computed_value',null=True)
   error = fields.CharField(attribute='error',null=True)
-  id = fields.IntegerField(attribute='id', null=True)
   
   class Meta:
     allowed_methods = ['get',]
@@ -85,20 +84,22 @@ class ModelMethodResource(Resource):
       If the returned value of the method is a subclass of Django's Model then we'll need 
       to take special steps to serialize it. 
       
-      TODO - this currently assumes a single object (as opposed to a Queryset) and doesn't 
-      inspect that object to return full data about its relations. We probably want to do
-      something like:
-      
-      for field in computed_value._meta.fields:
-        if field.get_internal_type() == 'ForeignKey':
-          computed_value[field.name] = Object.objects.get(pk=computed_value[field.name])
-          or something
       """
       if isinstance(computed_value, Model):
         serialized = serializers.serialize('json', [computed_value,])
         obj = simplejson.loads(serialized)
-        return_val['id'] = computed_value.pk
-        computed_value = obj[0]['fields']
+        obj[0]['fields']['id'] = computed_value.pk
+        computed_value = simplejson.dumps(obj[0]['fields'])
+      
+      elif isinstance(computed_value, QuerySet):
+        return_list = []
+        
+        serialized = serializers.serialize('json', computed_value)
+        obj_list = simplejson.loads(serialized)
+        
+        for obj in obj_list:
+          obj['fields']['id'] = obj['pk']
+          return_list.append(obj['fields'])
       
       return_val['computed_value'] = computed_value
       return [container.Generic(initial=return_val),]
