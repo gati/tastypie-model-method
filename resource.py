@@ -63,7 +63,6 @@ class ModelMethodResource(Resource):
         return [container.Generic(initial=return_val),]
       
       method = getattr(object_instance, method_name)
-      return_val['id'] = object_instance.pk
       
       """
       In case we're returning a method decorated with @property
